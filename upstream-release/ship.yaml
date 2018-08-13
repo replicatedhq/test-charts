@@ -1,0 +1,12 @@
+
+---
+assets:
+  v1: []
+
+config:
+  v1: []
+
+lifecycle:
+  v1:
+    - helmIntro: {}
+  
