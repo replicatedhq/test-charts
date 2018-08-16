@@ -1,6 +1,6 @@
 replicaCount: 3
 image:
   repository: nginx
-  tag: stable
+  tag: latest
 
 containerPort: 80
