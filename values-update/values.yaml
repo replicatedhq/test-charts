@@ -1,5 +1,6 @@
-replicaCount: 1
+replicaCount: 3
 image:
   repository: nginx
   tag: stable
 
+containerPort: 80
