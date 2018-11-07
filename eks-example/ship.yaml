@@ -1,0 +1,263 @@
+assets:
+  v1:
+  - amazon_eks:
+      dest: tf/new_vpc.tf
+      cluster_name: new-vpc-cluster
+      region: "us-west-2"
+      created_vpc:
+        vpc_cidr: "10.0.0.0/16"
+        zones:
+        - us-west-2a
+        - us-west-2b
+        public_subnets:
+        - "10.0.1.0/24"
+        - "10.0.2.0/24"
+        private_subnets:
+        - "10.0.129.0/24"
+        - "10.0.130.0/24"
+      autoscaling_groups:
+      - name: alpha
+        group_size: '{{repl ParseInt (ConfigOption "cluster_size")}}'
+        machine_type: '{{repl ConfigOption "machine_type"}}'
+  - inline:
+      dest: tf/nodeport.tf
+      contents: |+
+        resource "aws_alb" "guestbook_eks" {
+          name     = "${var.guestbook_eks_lb_name}"
+          internal = false
+
+          security_groups = [
+            "${aws_security_group.eks_public_https.id}",
+          ]
+
+          subnets = [
+            "${module.vpc.public_subnets[0]}",
+            "${module.vpc.public_subnets[1]}",
+          ]
+
+          enable_deletion_protection = false
+
+          tags {
+            Environment = "${var.environment_name}"
+            Owner       = "terraform"
+          }
+        }
+
+        resource "aws_alb_target_group" "guestbook_eks" {
+          name                 = "tf-matomo-eks"
+          port                 = 30065
+          protocol             = "HTTP"
+          vpc_id               = "${module.vpc.vpc_id}"
+          deregistration_delay = 120
+
+          health_check {
+            healthy_threshold   = 2
+            unhealthy_threshold = 2
+            timeout             = 2
+            interval            = 5
+            path                = "/healthz"
+            matcher             = "200"
+          }
+        }
+
+        resource "aws_alb_listener" "guestbook_eks" {
+          load_balancer_arn = "${aws_alb.guestbook_eks.arn}"
+          port              = "80"
+          protocol          = "HTTP"
+
+          default_action {
+            target_group_arn = "${aws_alb_target_group.guestbook_eks.arn}"
+            type             = "forward"
+          }
+        }
+
+        resource "aws_autoscaling_attachment" "guestbook_eks" {
+          autoscaling_group_name = "${module.eks.workers_asg_names[0]}"
+          alb_target_group_arn   = "${aws_alb_target_group.guestbook_eks.arn}"
+        }
+  - inline:
+      dest: k8s/redis-master-service.yml
+      contents: |+
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: redis-master
+          labels:
+            app: redis
+            role: master
+            tier: backend
+        spec:
+          ports:
+          - port: 6379
+            targetPort: 6379
+          selector:
+            app: redis
+            role: master
+            tier: backend
+  - inline:
+      dest: k8s/redis-master.yml
+      contents: |+
+        apiVersion: apps/v1 
+        kind: Deployment
+        metadata:
+          name: redis-master
+          labels:
+            app: redis
+        spec:
+          selector:
+            matchLabels:
+              app: redis
+              role: master
+              tier: backend
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                app: redis
+                role: master
+                tier: backend
+            spec:
+              containers:
+              - name: master
+                image: redis
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 100Mi
+                ports:
+                - containerPort: 6379
+  - inline:
+      dest: k8s/redis-slave.yml
+      contents: |+
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: redis-slave
+          labels:
+            app: redis
+        spec:
+          selector:
+            matchLabels:
+              app: redis
+              role: slave
+              tier: backend
+          replicas: 2
+          template:
+            metadata:
+              labels:
+                app: redis
+                role: slave
+                tier: backend
+            spec:
+              containers:
+              - name: slave
+                image: gcr.io/google_samples/gb-redisslave:v1
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 100Mi
+                env:
+                - name: GET_HOSTS_FROM
+                  value: dns
+                ports:
+                - containerPort: 6379
+  - inline:
+      dest: k8s/redis-slave-service.yml
+      contents: |+
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: redis-slave
+          labels:
+            app: redis
+            role: slave
+            tier: backend
+        spec:
+          ports:
+          - port: 6379
+          selector:
+            app: redis
+            role: slave
+            tier: backend
+  - inline:
+      dest: k8s/frontend.yaml
+      contents: |+
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: frontend
+          labels:
+            app: guestbook
+        spec:
+          selector:
+            matchLabels:
+              app: guestbook
+              tier: frontend
+          replicas: 3
+          template:
+            metadata:
+              labels:
+                app: guestbook
+                tier: frontend
+            spec:
+              containers:
+              - name: php-redis
+                image: gcr.io/google-samples/gb-frontend:v4
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 100Mi
+                env:
+                - name: GET_HOSTS_FROM
+                  value: dns
+                ports:
+                - containerPort: 80
+  - inline:
+      dest: k8s/frontent-service.yaml
+      contents: |+
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: frontend
+          labels:
+            app: guestbook
+            tier: frontend
+        spec:
+          type: NodePort
+          ports:
+          - port: 80
+            nodePort: 30065
+          selector:
+            app: guestbook
+            tier: frontend
+
+config: 
+  v1:
+  - name: cluster_options
+    title: EKS Cluster Options
+    items:
+    - name: cluster_size
+      title: Cluster Size
+      default: "3"
+    - name: machine_type
+      title: Machine Type
+      default: "m5.large"
+
+lifecycle:
+  v1:
+  - message:
+      contents: "creating an eks cluster"
+  - config: {}
+  - render:
+      root: "./"
+  - kustomize:
+      base: k8s/
+      overlay: overlays/ship
+      dest: rendered.yaml
+  - terraform:
+      path: tf/
+  - message:
+      contents: "and now applying kubernetes to the newly created cluster"
+  - kubectlApply:
+      path: rendered.yaml
+      kubeconfig: '{{repl AmazonEKS "new-vpc-cluster" }}'
