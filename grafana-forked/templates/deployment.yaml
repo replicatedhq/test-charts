@@ -93,8 +93,6 @@ spec:
           image: "{{ .Values.sidecar.image }}"
           imagePullPolicy: {{ .Values.sidecar.imagePullPolicy }}
           env:
-            - name: NEEDED_TO_FORK
-              value: "had to fork"
             - name: LABEL
               value: "{{ .Values.sidecar.datasources.label }}"
             - name: FOLDER
@@ -173,6 +171,8 @@ spec:
               containerPort: 3000
               protocol: TCP
           env:
+            - name: NEEDED_TO_FORK
+              value: "had to fork"
             - name: GF_SECURITY_ADMIN_USER
               valueFrom:
                 secretKeyRef:
