@@ -266,7 +266,7 @@ spec:
       annotations:
         checksum/configmap: 23853843a059c57c5633a34ba022f8145d1401d7b00dc5945ead28cf322e18df
         checksum/health: a70f637bcac29808c7ba9227b633914ef262bc8a0358bd4e7aeab02ba1ac8ea2
-        checksum/secret: c84125db4f74e812a6a957248989715a5a940e6e4d15a03d1d503f7ca5888f5e
+        checksum/secret: FORKED_CHECKSUM
       labels:
         app: redis
         chart: redis-5.0.0
