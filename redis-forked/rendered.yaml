@@ -34,19 +34,41 @@ kind: ConfigMap
 metadata:
   labels:
     app: redis
-    chart: redis-4.3.1
+    chart: redis-5.0.0
     heritage: Tiller
     release: redis
   name: redis-health
 ---
 apiVersion: v1
 data:
-  redis-password: ZzdDUGxQWGhpcg==
+  master.conf: |-
+    dir /data
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+  redis.conf: |-
+    # User-supplied configuration:
+    # maxmemory-policy volatile-lru
+  replica.conf: |-
+    dir /data
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+kind: ConfigMap
+metadata:
+  labels:
+    app: redis
+    chart: redis-5.0.0
+    heritage: Tiller
+    release: redis
+  name: redis
+---
+apiVersion: v1
+data:
+  redis-password: IM_A_PASSWORD
 kind: Secret
 metadata:
   labels:
     app: redis
-    chart: redis-4.3.1
+    chart: redis-5.0.0
     heritage: Tiller
     release: redis
   name: redis
@@ -57,7 +79,7 @@ kind: Service
 metadata:
   labels:
     app: redis
-    chart: redis-4.3.1
+    chart: redis-5.0.0
     heritage: Tiller
     release: redis
   name: redis-master
@@ -77,7 +99,7 @@ kind: Service
 metadata:
   labels:
     app: redis
-    chart: redis-4.3.1
+    chart: redis-5.0.0
     heritage: Tiller
     release: redis
   name: redis-slave
@@ -97,7 +119,7 @@ kind: StatefulSet
 metadata:
   labels:
     app: redis
-    chart: redis-4.3.1
+    chart: redis-5.0.0
     heritage: Tiller
     release: redis
   name: redis-master
@@ -111,17 +133,28 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/configmap: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/health: 815cea72224564f98a1c41721d26cff22dc016d2691779355da4267030732090
-        checksum/secret: 53876cc59e69b083b125a0b4541b70e8c9592b7fd751618642ebe73e95413f8f
+        checksum/configmap: 23853843a059c57c5633a34ba022f8145d1401d7b00dc5945ead28cf322e18df
+        checksum/health: a70f637bcac29808c7ba9227b633914ef262bc8a0358bd4e7aeab02ba1ac8ea2
+        checksum/secret: 7d8062c935157159cd0e3392280371c8cca1f35ccc16548d3f806c4ce09764ee
       labels:
         app: redis
-        chart: redis-4.3.1
+        chart: redis-5.0.0
         release: redis
         role: master
     spec:
       containers:
-      - env:
+      - args:
+        - --port
+        - $(REDIS_PORT)
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        - --include
+        - /opt/bitnami/redis/etc/redis.conf
+        - --include
+        - /opt/bitnami/redis/etc/master.conf
+        command:
+        - /run.sh
+        env:
         - name: REDIS_REPLICATION_MODE
           value: master
         - name: REDIS_PASSWORD
@@ -131,8 +164,6 @@ spec:
               name: redis
         - name: REDIS_PORT
           value: "6379"
-        - name: REDIS_DISABLE_COMMANDS
-          value: FLUSHDB,FLUSHALL
         image: docker.io/bitnami/redis:4.0.11
         imagePullPolicy: Always
         livenessProbe:
@@ -142,8 +173,8 @@ spec:
             - -c
             - /health/ping_local.sh
           failureThreshold: 5
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 5
+          periodSeconds: 5
           successThreshold: 1
           timeoutSeconds: 5
         name: redis
@@ -158,29 +189,31 @@ spec:
             - /health/ping_local.sh
           failureThreshold: 5
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 5
           successThreshold: 1
           timeoutSeconds: 1
         resources: null
         volumeMounts:
         - mountPath: /health
           name: health
-        - mountPath: /bitnami/redis/data
+        - mountPath: /data
           name: redis-data
           subPath: null
+        - mountPath: /opt/bitnami/redis/etc
+          name: config
       initContainers:
       - command:
         - /bin/chown
         - -R
         - 1001:1001
-        - /bitnami/redis/data
+        - /data
         image: docker.io/bitnami/minideb:latest
         imagePullPolicy: HELLO_IM_FORKED
         name: volume-permissions
         securityContext:
           runAsUser: 0
         volumeMounts:
-        - mountPath: /bitnami/redis/data
+        - mountPath: /data
           name: redis-data
           subPath: null
       securityContext:
@@ -192,6 +225,9 @@ spec:
           defaultMode: 493
           name: redis-health
         name: health
+      - configMap:
+          name: redis
+        name: config
   updateStrategy:
     type: RollingUpdate
   volumeClaimTemplates:
@@ -214,7 +250,7 @@ kind: Deployment
 metadata:
   labels:
     app: redis
-    chart: redis-4.3.1
+    chart: redis-5.0.0
     heritage: Tiller
     release: redis
   name: redis-slave
@@ -228,17 +264,33 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/configmap: 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
-        checksum/health: 815cea72224564f98a1c41721d26cff22dc016d2691779355da4267030732090
-        checksum/secret: 550a9aff8c4baf0a9ea1441e4c421fb043a3f7672f43daca43e2afd93cf218c8
+        checksum/configmap: 23853843a059c57c5633a34ba022f8145d1401d7b00dc5945ead28cf322e18df
+        checksum/health: a70f637bcac29808c7ba9227b633914ef262bc8a0358bd4e7aeab02ba1ac8ea2
+        checksum/secret: c84125db4f74e812a6a957248989715a5a940e6e4d15a03d1d503f7ca5888f5e
       labels:
         app: redis
-        chart: redis-4.3.1
+        chart: redis-5.0.0
         release: redis
         role: slave
     spec:
       containers:
-      - env:
+      - args:
+        - --port
+        - $(REDIS_PORT)
+        - --slaveof
+        - $(REDIS_MASTER_HOST)
+        - $(REDIS_MASTER_PORT_NUMBER)
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        - --masterauth
+        - $(REDIS_MASTER_PASSWORD)
+        - --include
+        - /opt/bitnami/redis/etc/redis.conf
+        - --include
+        - /opt/bitnami/redis/etc/replica.conf
+        command:
+        - /run.sh
+        env:
         - name: REDIS_REPLICATION_MODE
           value: slave
         - name: REDIS_MASTER_HOST
@@ -257,8 +309,6 @@ spec:
             secretKeyRef:
               key: redis-password
               name: redis
-        - name: REDIS_DISABLE_COMMANDS
-          value: FLUSHDB,FLUSHALL
         image: docker.io/bitnami/redis:4.0.11
         imagePullPolicy: Always
         livenessProbe:
@@ -267,9 +317,9 @@ spec:
             - sh
             - -c
             - /health/ping_local_and_master.sh
-          failureThreshold: 5
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          failureThreshold: HI_IM_FORKED
+          initialDelaySeconds: 5
+          periodSeconds: 5
           successThreshold: 1
           timeoutSeconds: 5
         name: redis
@@ -282,15 +332,19 @@ spec:
             - sh
             - -c
             - /health/ping_local_and_master.sh
-          failureThreshold: HI_IM_FORKED
+          failureThreshold: 5
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 5
           successThreshold: 1
           timeoutSeconds: 1
         resources: null
         volumeMounts:
         - mountPath: /health
           name: health
+        - mountPath: /data
+          name: redis-data
+        - mountPath: /opt/bitnami/redis/etc
+          name: config
       securityContext:
         fsGroup: 1001
         runAsUser: 1001
@@ -300,3 +354,8 @@ spec:
           defaultMode: 493
           name: redis-health
         name: health
+      - configMap:
+          name: redis
+        name: config
+      - emptyDir: {}
+        name: redis-data
