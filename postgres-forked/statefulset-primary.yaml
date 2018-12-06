@@ -118,11 +118,7 @@ spec:
           mountPath: /docker-entrypoint-initdb.d
         - name: data
           mountPath: /bitnami/postgresql
-
-
-
       volumes:
-
       - name: custom-init-scripts
         configMap:
           name: postgres-postgresql-init-scripts

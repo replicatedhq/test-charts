@@ -112,11 +112,7 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /bitnami/postgresql
-
-
-
-      volumes:
-
+      volumes: []
   volumeClaimTemplates:
     - metadata:
         name: data
