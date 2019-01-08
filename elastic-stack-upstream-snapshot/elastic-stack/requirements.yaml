@@ -3,37 +3,9 @@ dependencies:
   version: ^1.10.0
   repository: file://../elasticsearch
 - name: kibana
-  version: ^0.16.0
+  version: 1.1.2
   repository: file://../kibana
-- name: filebeat
-  version: ^1.0.0
-  repository: file://../filebeat
-  condition: filebeat.enabled
 - name: logstash
   version: ^1.2.1
   repository: file://../logstash
   condition: logstash.enabled
-- name: fluentd
-  version: ^1.0.0
-  repository: file://../fluentd
-  condition: fluentd.enabled
-- name: fluent-bit
-  version: ^0.13.0
-  repository: file://../fluent-bit
-  condition: fluent-bit.enabled
-- name: fluentd-elasticsearch
-  version: ^1.0.0
-  repository: file://../fluentd-elasticsearch
-  condition: fluentd-elasticsearch.enabled
-- name: nginx-ldapauth-proxy
-  version: ^0.1.0
-  repository: file://../nginx-ldapauth-proxy
-  condition: nginx-ldapauth-proxy.enabled
-- name: elasticsearch-curator
-  version: ^1.0.0
-  repository: file://../elasticsearch-curator
-  condition: elasticsearch-curator.enabled
-- name: elasticsearch-exporter
-  version: ^0.4.0
-  repository: file://../elasticsearch-exporter
-  condition: elasticsearch-exporter.enabled
