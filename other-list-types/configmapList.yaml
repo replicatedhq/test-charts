@@ -8,4 +8,4 @@ items:
 - apiVersion: v1
   kind: ConfigMap
   metadata:
-    name: winnie
+    name: notwinnie
